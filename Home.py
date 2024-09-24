@@ -40,7 +40,7 @@ def validate_api_key(api_key: str):
     except Exception as e:
         raise ValueError(f"API key validation failed: {str(e)}")
 
-@flow(name="Streamlit AI Assistant Flow", log_prints=True)
+@flow(name="Streamlit_AI_Assistant_Flow", log_prints=True)
 def ai_assistant_flow(prompt: str, model: str, temperature: float, api_key: str):
     if prompt:
         with st.spinner("Validating API key..."):
@@ -76,3 +76,5 @@ if __name__ == "__main__":
         ai_assistant_flow(user_input, model, temperature, api_key)
     else:
         st.warning("Please enter a valid OpenAI API key in the sidebar.")
+        
+        
