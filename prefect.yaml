@@ -1,0 +1,71 @@
+version: "2.0"
+
+projects:
+  - name: prefect-streamlit
+    description: "Deploy Streamlit app to GKE cluster"
+    flows:
+      - name: Streamlit AI Assistant Flow
+        file: Demos/prefect-streamlit/Home.py
+        entrypoint: ai_assistant_flow
+      - name: Sales Analysis Flow
+        file: Demos/prefect-streamlit/pages/Salesv2.py
+        entrypoint: main
+
+deployments:
+  - name: streamlit-gke-deployment  # Name of the deployment
+    flow_name: Streamlit AI Assistant Flow  # Name of the flow to be deployed
+    infrastructure:
+      type: kubernetes-job  # Specifies that this will run as a Kubernetes job
+      namespace: default  # Kubernetes namespace to deploy to
+      job:
+        apiVersion: batch/v1  # Kubernetes API version for Job
+        kind: Job  # Kubernetes resource type
+        metadata:
+          name: streamlit-app-job  # Name of the Kubernetes job
+        spec:
+          template:
+            spec:
+              containers:
+                - name: streamlit-app-container  # Name of the container
+                  image: your-docker-image:latest  # Docker image to use (replace with actual image)
+                  command: ["python", "-m", "streamlit", "run", "Home.py"]  # Command to run the Streamlit app
+                  env:
+                    - name: PREFECT_API_URL
+                      value: "http://your-prefect-api-url"  # URL for Prefect API (replace with actual URL)
+                    - name: PREFECT_API_KEY
+                      valueFrom:
+                        secretKeyRef:
+                          name: prefect-api-key  # Name of the Kubernetes secret
+                          key: api-key  # Key in the secret that contains the API key
+              restartPolicy: Never  # Do not restart the job on failure
+    schedule:
+      cron: "0 0 * * *"  # Runs daily at midnight (UTC)
+
+  # - name: sales-analysis-gke-deployment
+  #   flow_name: Sales Analysis Flow
+  #   infrastructure:
+  #     type: kubernetes-job
+  #     namespace: default
+  #     job:
+  #       apiVersion: batch/v1
+  #       kind: Job
+  #       metadata:
+  #         name: sales-analysis-job
+  #       spec:
+  #         template:
+  #           spec:
+  #             containers:
+  #               - name: sales-analysis-container
+  #                 image: your-docker-image:latest
+  #                 env:
+  #                   - name: PREFECT_API_URL
+  #                     value: "http://your-prefect-api-url"
+  #                   - name: PREFECT_API_KEY
+  #                     valueFrom:
+  #                       secretKeyRef:
+  #                         name: prefect-api-key
+  #                         key: api-key
+  #             restartPolicy: Never
+  #   schedule:
+  #     cron: "0 12 * * *"  # Runs daily at noon
+
