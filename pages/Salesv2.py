@@ -41,7 +41,7 @@ class AuditReport(BaseModel):
     markdown: str
 
 # Task to load the sales data
-@task(name="Load Sales Data", retries=3, retry_delay_seconds=10, log_prints=True)
+@task(name="load_sales_data", retries=3, retry_delay_seconds=10, log_prints=True)
 def load_data(uploaded_file) -> pd.DataFrame:
     """
     Load the sales data from a CSV file.
@@ -54,7 +54,7 @@ def load_data(uploaded_file) -> pd.DataFrame:
         return pd.DataFrame()
 
 # Task to check the data for any issues
-@task(name="Check Data", retries=2, retry_delay_seconds=5, log_prints=True)
+@task(name="check_data", retries=2, retry_delay_seconds=5, log_prints=True)
 def check_data(df: pd.DataFrame) -> bool:
     """
     Check the data for any issues.
@@ -68,7 +68,7 @@ def check_data(df: pd.DataFrame) -> bool:
     return True
 
 # Task to compute overview metrics
-@task(name="Compute Overview", log_prints=True)
+@task(name="compute_overview", log_prints=True)
 def compute_overview(df: pd.DataFrame) -> Dict[str, float]:
     """
     Compute overview metrics.
@@ -89,7 +89,7 @@ def compute_overview(df: pd.DataFrame) -> Dict[str, float]:
     }
 
 # Visualization tasks, each dependent on the previous one
-@task(name="Plot Category Sales", log_prints=True)
+@task(name="plot_category_sales", log_prints=True)
 def plot_category_sales(df: pd.DataFrame) -> px.bar:
     start_time = time.time()
 
@@ -106,7 +106,7 @@ def plot_category_sales(df: pd.DataFrame) -> px.bar:
         "execution_time": duration
     }
 
-@task(name="Plot Sales Trend", log_prints=True)
+@task(name="plot_sales_trend", log_prints=True)
 def plot_sales_trend(df: pd.DataFrame) -> px.line:
     start_time = time.time()
     df['Date'] = pd.to_datetime(df['Date'])
@@ -123,7 +123,7 @@ def plot_sales_trend(df: pd.DataFrame) -> px.line:
         "execution_time": duration
     }
 
-@task(name="Plot Top Products", log_prints=True)
+@task(name="plot_top_products", log_prints=True)
 def plot_top_products(df: pd.DataFrame) -> px.bar:
     start_time = time.time()
     top_products = df.groupby('Product Name')['Units Sold'].sum().sort_values(ascending=False).head(10).reset_index()
@@ -139,7 +139,7 @@ def plot_top_products(df: pd.DataFrame) -> px.bar:
         "execution_time": duration
     }
 
-@task(name="Plot Regional Sales")
+@task(name="plot_regional_sales")
 def plot_regional_sales(df: pd.DataFrame) -> px.pie:
     start_time = time.time()
     region_sales = df.groupby('Region')['Total Revenue'].sum().reset_index()
@@ -155,7 +155,7 @@ def plot_regional_sales(df: pd.DataFrame) -> px.pie:
         "execution_time": duration
     }
 
-@task(name="Plot Payment Methods")
+@task(name="plot_payment_methods")
 def plot_payment_methods(df: pd.DataFrame) -> px.pie:
     start_time = time.time()
     payment_method = df['Payment Method'].value_counts().reset_index()
@@ -194,48 +194,46 @@ def create_execution_times_markdown(task_execution_times: list):
         markdown=markdown,
         description="Execution times of each task in the data analysis flow.",
     )
-@flow(name="Control Flow Analysis")
+    
+@flow(name="control_flow_analysis")
 def control_flow_analysis(df: pd.DataFrame):
     """
     Analyze the sales data using ControlFlow.
     """
+    # Create a specialized agent 
+    classifier = cf.Agent(
+        name="Email Classifier",
+        model="openai/gpt-4o-mini",
+        instructions="You are an expert at quickly classifying emails.",
+    )
+
     # Initialize a list to collect execution times
-    task_execution_times = []
+    emails = [
+        "Hello, I need an update on the project status.",
+        "Subject: Exclusive offer just for you!",
+        "Urgent: Project deadline moved up by one week.",
+    ]
     time.sleep(3)
+    # Set up a ControlFlow task to classify emails
+    classifications = cf.run(
+        'Classify the emails',
+        result_type=['important', 'spam'],
+        agents=[classifier],
+        context=dict(emails=emails),
+    )
     # Check the data
-    data_valid = check_data.submit(df)
-    time.sleep(3)
-    if not data_valid.result():
-        st.error("Data validation failed. Please check your data and try again.")
-        try:
-            data_str = df.to_csv(index=False)
-            report_task = CFTask(
-                """
-                You are an expert data analyst. Analyze the provided sales data and generate a markdown report summarizing key insights.
-                """,
-                context=dict(
-                    data=data_str,
-                ),
-                result_type=AuditReport,
-                agents=[audit_agent],
-            )
-            report_task.run()
-            report = report_task.result
-            st.header(report.title)
-            st.markdown(report.markdown)
-            # Create a markdown artifact for the report
-            create_markdown_artifact(
-                key="audit-report",
-                markdown=f"# {report.title}\n\n{report.markdown}",
-                description="Audit report generated by the AI agent.",
-            )
-        except Exception as e:
-            st.error(f"An error occurred while generating the report: {e}")
-            logging.error("Error during report generation", exc_info=True)
-            return
+    # Create a ControlFlow task to generate an reply
+    reply = cf.run(
+        "Write a polite reply to an email",
+        context=dict(email=emails[0]),
+    )
+    logger.info(f"Classifications: {classifications}")
+    logger.info(f"Reply: {reply}")
+
+    
 
 # Main analysis flow
-@flow(name="Analyze Data", log_prints=True, description="Analyze the sales data using Prefect tasks and flows.")
+@flow(name="analyze_data", log_prints=True, description="Analyze the sales data using Prefect tasks and flows.")
 def analyze_data(df: pd.DataFrame):
     """
     Analyze the sales data using Prefect tasks and flows.
@@ -439,12 +437,50 @@ def analyze_data(df: pd.DataFrame):
     create_execution_times_markdown(task_execution_times)
 
     logger.info("Data analysis flow completed")
+    my_flow()
 
-    control_flow_analysis(df)
+@task
+def always_fails_task():
+    time.sleep(5)
+    raise ValueError("I am bad task")
+
+
+@task
+def always_succeeds_task():
+    time.sleep(5)
+    return "foo"
+
+
+@flow
+def always_succeeds_flow():
+    time.sleep(5)
+    return "bar"
+
+
+@flow
+def always_fails_flow():
+    x = always_fails_task()
+    y = always_succeeds_task()
+    z = always_succeeds_flow()
+    return x, y, z
+
+
+@task 
+def add_one(x):
+    return x + 1
+
+@flow 
+def my_flow():
+    # avoided raising an exception via `return_state=True`
+    state = add_one("1", return_state=True)
+    assert state.is_failed()
+    always_fails_flow()
+    time.sleep(20)
+
 
 
 # Main function to run the Streamlit app
-@flow(name="Sales Analysis Flow", log_prints=True)
+@flow(name="sales_analysis_flow", log_prints=True,)
 def main():
     """
     Main function to run the Streamlit app.
@@ -467,6 +503,7 @@ def main():
                     # logger.error("ERROR level log message.")
                     # logger.critical("CRITICAL level log message.")
                     analyze_data(df)
+                    my_flow() # flow to test exception handling
                 else:
                     st.error("No data found in the uploaded file.")
             except Exception as e:
@@ -474,6 +511,18 @@ def main():
                 logging.error("Error during data loading", exc_info=True)
     else:
         st.info("Please upload a CSV file to proceed.")
+
+        
+    # Check the Prefect state of the analyze_data function
+    # load_data_state = load_data.submit
+    # time.sleep(5)
+    # if load_data_state and load_data_state.result():
+    #     st.write("Data analysis completed. Running additional control flow analysis...")
+    #     # Run the control flow analysis
+    #     control_flow_analysis(df)
+        
+    # else:
+    #     st.write(f"Data analysis not yet complete. Current state: {load_data_state.name if load_data_state else 'Unknown'}")
 
 if __name__ == "__main__":    
     main()
