@@ -202,7 +202,7 @@ def create_execution_times_markdown(task_execution_times: list):
     )
     
 @flow(name="control_flow_analysis")
-def control_flow_analysis(df: pd.DataFrame):
+def control_flow_analysis():
     """
     Analyze the sales data using ControlFlow.
     """
