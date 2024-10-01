@@ -41,15 +41,21 @@ class AuditReport(BaseModel):
     markdown: str
 
 # Task to load the sales data
-@task(name="load_sales_data", retries=3, retry_delay_seconds=10, log_prints=True)
+@task(name="load_data", retries=3, retry_delay_seconds=10, log_prints=True)
 def load_data(uploaded_file) -> pd.DataFrame:
     """
     Load the sales data from a CSV file.
     """
     if uploaded_file is not None:
-        uploaded_file.seek(0)
-        df = pd.read_csv(uploaded_file)
-        return df
+        try:
+            uploaded_file.seek(0)
+            df = pd.read_csv(uploaded_file)
+            print(f"DataFrame shape: {df.shape}")
+            print(f"DataFrame columns: {df.columns}")
+            return df
+        except Exception as e:
+            print(f"Error loading data: {str(e)}")
+            raise
     else:
         return pd.DataFrame()
 
@@ -491,19 +497,21 @@ def main():
     if uploaded_file is not None:
         with st.spinner('Loading data...'):
             try:
-                # Load data using Prefect task
                 df_future = load_data.submit(uploaded_file)
                 time.sleep(7)
                 df = df_future.result()
                 if not df.empty:
                     st.success('Data loaded successfully!')
-                    # Run the analysis flow
-                    # logger = get_run_logger()
-                    # logger.debug("DEBUG level log message.")
-                    # logger.error("ERROR level log message.")
-                    # logger.critical("CRITICAL level log message.")
-                    analyze_data(df)
-                    my_flow() # flow to test exception handling
+                    try:
+                        analyze_data(df)
+                    except Exception as e:
+                        st.error(f"An error occurred during data analysis: {e}")
+                        logging.error("Error during data analysis", exc_info=True)
+                    try:
+                        my_flow()
+                    except Exception as e:
+                        st.error(f"An error occurred in my_flow: {e}")
+                        logging.error("Error in my_flow", exc_info=True)
                 else:
                     st.error("No data found in the uploaded file.")
             except Exception as e:
