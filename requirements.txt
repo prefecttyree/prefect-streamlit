@@ -4,3 +4,5 @@ controlflow==0.9.1
 anthropic>=0.28.0
 plotly>=5.24.1
 pydantic>=2.6.4
+google>=3.0.0
+prefect-docker>=0.3.1
