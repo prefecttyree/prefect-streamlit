@@ -14,13 +14,20 @@ build:
     image_name: tytheprefectionist/prefect-streamlit
     tag: latest
     dockerfile: auto
-    push: True
+
+pull:
+- prefect.deployments.steps.git_clone:
+    repository: https://github.com/tytheprefectionist/prefect-streamlit.git
+    credentials: '{{ prefect.blocks.github-credentials.github-creds }}'
+    work_dir: /opt/prefect/flows
+
 # # push section allows you to manage if and how this project is uploaded to remote locations
-# push:
-# - prefect_docker.deployments.steps.push_docker_image:
-#     requires: prefect-docker>=0.3.1
-#     image_name: '{{ build_image.image_name }}'
-#     tag: '{{ build_image.tag }}'
+push:
+- prefect_docker.deployments.steps.push_docker_image:
+    requires: prefect-docker>=0.3.1
+    image_name: '{{ build_image.image_name }}'
+    tag: '{{ build_image.tag }}'
+    credentials: '{{ prefect.blocks.docker-registry-credentials.docker-creds }}'
 
 
 # pull section allows you to provide instructions for cloning this project in remote locations
@@ -47,29 +54,52 @@ build:
 # the deployments section allows you to provide configuration for deploying flows
 deployments:
 - name: control-flow-analysis
-  description: "Deployment for sales analysis"
+  description: Deployment for sales analysis
   tags:
-    - salesv2
-    - analysis
+  - salesv2
+  - analysis
   entrypoint: pages/Salesv2.py:control_flow_analysis
+  parameters:
+    OPENAI_API_KEY: ''
+  job_variables:
+    env:
+      OPENAI_API_KEY: '{{ prefect.secrets.OPENAI_API_KEY }}'
   work_pool:
     name: gke-pool
 
-- name: practice
-  description: "Deployments for practice"
+- name: fetch-weather
+  description: Deployments for practice
   tags:
-    - salesv2
-    - analysis
+  - fetch-weather
+  - pipeline-flow
   entrypoint: pages/Practice.py:pipeline
   work_pool:
-    name: gke-pool
+    name: cloud-runv2
 
 
-- name: cloud-run
-  description: "Deployments for cloud run"
+- name: sales-analysis
+  description: Deployments for cloud run
   tags:
-    - cloud-run
-    - analysis
-  entrypoint: pages/Salesv2.py:control_flow_analysis
+  - cloud-run
+  - sales-analysis
+  entrypoint: pages/Salesv2.py:sales_analysis_flow
   work_pool:
-    name: cloud-run
+    name: cloud-runv2
+
+- name: my_flow_on_cloud_run
+  description: My Flow Deployments for Cloud Run
+  tags:
+  - cloud-run
+  - parent:sales-analysis
+  entrypoint: pages/Salesv2.py:my_flow
+  work_pool:
+    name: cloud-runv2
+
+- name: my_flow_on_gke
+  description: My Flow Deployments for GKE
+  tags:
+  - gke-pool
+  - parent:sales-analysis
+  entrypoint: pages/Salesv2.py:my_flow
+  work_pool:
+    name: gke-pool

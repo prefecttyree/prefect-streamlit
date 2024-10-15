@@ -475,7 +475,7 @@ def always_fails_flow():
 def add_one(x):
     return x + 1
 
-@flow 
+@flow(name="my_flow",log_prints=True)
 def my_flow():
     # avoided raising an exception via `return_state=True`
     state = add_one("1", return_state=True)

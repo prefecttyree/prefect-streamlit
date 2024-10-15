@@ -47,9 +47,16 @@ def pipeline(lat: float = 38.9, lon: float = -77.0):
     return result
 
 
+from prefect import flow
 
+@flow(log_prints=True)
+def buy():
+    print("Buying securities")
+    
 
 if __name__ == "__main__":
-    #pipeline.serve(name="fetch-weather-data" )
-    pipeline()
+    buy.deploy(name="buy-deployment",
+               work_pool_name="my-kubernetes-pool",
+               image="your-image-registry-username/your-image-name:tag",
+               push=False)
     
